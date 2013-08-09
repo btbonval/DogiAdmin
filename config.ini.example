@@ -1,0 +1,29 @@
+[server]
+# set what address and port the server should listen on.
+address=0.0.0.0
+port=80
+
+[ssl]
+# SSL parameters.
+# ssl_enabled=false is never recommended.
+enabled=true
+# Specify both certificate_path and certificate_key_path ...
+certificate_path=
+certificate_key_path=
+# ... OR specify certificate_pem_path
+# certificate_pem_path will override certificate_path and certificate_key_path
+certificate_pem_path=
+
+[logging]
+# stdout, stderr, and file are independently configured.
+# stdout=true will send logging information to stdout. Not recommended.
+stdout=false
+# stderr=true will send logging information to stderr.
+stderr=true
+# file=path/to/file will write logging information to the file.
+# file= will not write logging information to disk.
+file=
+
+[keys]
+# This section contains transient, encrypted key pairs.
+# DO NOT MODIFY THIS SECTION.
