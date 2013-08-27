@@ -26,19 +26,13 @@ elif py_version.startswith('3.'):
 ##
 
 try:
-    from twisted.web import http
-    from twisted.python import log
-    from twisted.internet import ssl
-    from twisted.internet import reactor
-    from twisted.internet import endpoints
-    from twisted.internet.protocol import Factory
+    from twisted.application.service import Service
 except ImportError:
     sys.err.println("The Twisted module must be installed and accessible.")
     sys.exit(1)
 
 try:
-    # Even if SSL is not used, a cryptographically secure PRNG is needed
-    # for temporary keys.
+    # A cryptographically secure P-RNG is needed for temporary keys.
     import OpenSSL.rand as PRNG
 except ImportError:
     sys.err.println("The OpenSSL module must be installed and accessible.")
@@ -55,21 +49,18 @@ config_files = ('config.ini',)
 # Main Loop class definition
 ##
 
-class LoopController(object):
+class Configurator(Service):
     '''
-    This class calls the main loop.
-    In theory, this class would be instantiated as a singleton object.
+    Manage configuration IO as a service.
     '''
 
-    def __init__(self):
+    def startService(self):
         '''
-        Initialize / create the controller object.
+        Initialize the connection to the configuration store.
         '''
 
-        # Once the server starts running, failures should be reported then
-        # forgotten. If the server is not yet running, failures should abort
-        # execution.
-        self.running = False
+        # super()
+        Service.startService(self)
 
         # Configuration parameters.
         self.configparser = SafeConfigParser()
@@ -77,14 +68,10 @@ class LoopController(object):
 
         # Populate configuration now or die trying.
         self.update_config()
+        # Timed updates to be called.
 
         # Placeholder encryption key for use when writing secure data to disk.
         self.encryption_key = None
-
-        # Although bad form to import here, it clearly shows the instance
-        # variable is a module.
-        import serverloop 
-        self.serverloop = serverloop
 
     def update_config(self):
         '''
@@ -102,7 +89,7 @@ class LoopController(object):
         if self.running and not files_read:
             # Server is running, but config reload failed.
             log.msg('Config requested but unable to load. Check {0}'.format(config_files))
-            return
+            return 'poop'
 
         # At this point, files_read is not empty, so config was read.
         # Hooray!
@@ -132,9 +119,7 @@ class LoopController(object):
             addr = self.config('get', 'server', 'address')
             port = self.config('getint', 'server', 'port')
             factory = Factory()
-            # TODO reload() needs to go into the factory which spawns Protocols
-            # or in a Protocol which has-a proxy object that is reloaded
-            # TODO http://twistedsphinx.funsize.net/projects/core/howto/upgrading.html
+            # TODO the reload() might need to go into the Protocol...
             reload(self.serverloop)
             factory.protocol = self.serverloop.LoopProtocol
 
@@ -158,14 +143,8 @@ class LoopController(object):
                 reactor.listenSSL(port, factory, cert.options())
             else:
                 reactor.listenTCP(port, factory)
-            # TODO
-            # endpoints.serverFromString(reactor, "tcp:PORT").listen(factory)
-            # endpoints.serverFromString(reactor, "ssl:PORT:keys...").listen(factory)
 
 
 if __name__ == '__main__':
     engine = LoopEngine()
     engine.run()
-
-    # `python -m twisted.conch.stdio` runs an interactive prompt and reactor
-    # import twisted stuff and give it a go. no need to start reactor??

@@ -24,6 +24,10 @@ stderr=true
 # file= will not write logging information to disk.
 file=
 
+[clients]
+# (identifier)=1 will indicate that identifier is a valid client
+# e.g. 4efa=1 means a client sending ID 4efa is considered valid
+
 [keys]
 # This section contains transient, encrypted key pairs.
 # DO NOT MODIFY THIS SECTION.

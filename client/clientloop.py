@@ -8,10 +8,6 @@ and updated at runtime.
 
 from twisted.internet.protocol import amp
 
-class Greeting(amp.Command):
-    arguments = [('iam', amp.String)]
-    response = [('valid', amp.Boolean)]
-
 class LoopProtocol(amp.AMP):
     def connectionMade(self):
         pass
@@ -19,8 +15,3 @@ class LoopProtocol(amp.AMP):
         pass
     def dataReceived(self, data):
         pass
-
-    def resolve_id(self, identity):
-        # Get an id from the client and verify it is valid.
-        # TODO
-        return 0

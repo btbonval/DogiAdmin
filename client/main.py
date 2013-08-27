@@ -30,7 +30,6 @@ try:
     from twisted.python import log
     from twisted.internet import ssl
     from twisted.internet import reactor
-    from twisted.internet import endpoints
     from twisted.internet.protocol import Factory
 except ImportError:
     sys.err.println("The Twisted module must be installed and accessible.")
@@ -132,9 +131,7 @@ class LoopController(object):
             addr = self.config('get', 'server', 'address')
             port = self.config('getint', 'server', 'port')
             factory = Factory()
-            # TODO reload() needs to go into the factory which spawns Protocols
-            # or in a Protocol which has-a proxy object that is reloaded
-            # TODO http://twistedsphinx.funsize.net/projects/core/howto/upgrading.html
+            # TODO the reload() might need to go into the Protocol...
             reload(self.serverloop)
             factory.protocol = self.serverloop.LoopProtocol
 
@@ -158,14 +155,3 @@ class LoopController(object):
                 reactor.listenSSL(port, factory, cert.options())
             else:
                 reactor.listenTCP(port, factory)
-            # TODO
-            # endpoints.serverFromString(reactor, "tcp:PORT").listen(factory)
-            # endpoints.serverFromString(reactor, "ssl:PORT:keys...").listen(factory)
-
-
-if __name__ == '__main__':
-    engine = LoopEngine()
-    engine.run()
-
-    # `python -m twisted.conch.stdio` runs an interactive prompt and reactor
-    # import twisted stuff and give it a go. no need to start reactor??
