@@ -26,146 +26,63 @@ elif py_version.startswith('3.'):
 ##
 
 try:
-    from twisted.web import http
     from twisted.python import log
     from twisted.internet import ssl
     from twisted.internet import reactor
     from twisted.internet import endpoints
-    from twisted.internet.protocol import Factory
+    from twisted.internet.protocol import ServerFactory
 except ImportError:
     sys.err.println("The Twisted module must be installed and accessible.")
     sys.exit(1)
 
-try:
-    # Even if SSL is not used, a cryptographically secure PRNG is needed
-    # for temporary keys.
-    import OpenSSL.rand as PRNG
-except ImportError:
-    sys.err.println("The OpenSSL module must be installed and accessible.")
-    sys.exit(2)
-
 ##
-# "Global" Constants
+# Local modules
 ##
 
-# one or more paths to the configuration file as used by SafeConfigParser
-config_files = ('config.ini',)
+import config
+import serverloop 
 
 ##
-# Main Loop class definition
+# Classes
 ##
 
-class LoopController(object):
-    '''
-    This class calls the main loop.
-    In theory, this class would be instantiated as a singleton object.
-    '''
+class DogiServerFactory(ServerFactory):
+    protocol = serverloop.LoopProtocol
 
-    def __init__(self):
-        '''
-        Initialize / create the controller object.
-        '''
-
-        # Once the server starts running, failures should be reported then
-        # forgotten. If the server is not yet running, failures should abort
-        # execution.
-        self.running = False
-
-        # Configuration parameters.
-        self.configparser = SafeConfigParser()
-        self.configlock = RLock()
-
-        # Populate configuration now or die trying.
-        self.update_config()
-
-        # Placeholder encryption key for use when writing secure data to disk.
-        self.encryption_key = None
-
-        # Although bad form to import here, it clearly shows the instance
-        # variable is a module.
-        import serverloop 
-        self.serverloop = serverloop
-
-    def update_config(self):
-        '''
-        Helper method to pull config into self.config.
-        '''
-        # Make sure self.configparser is not being used concurrently.
-        with self.configlock:
-            files_read = self.configparser.read(config_files)
-
-        if not self.running and not files_read:
-            # If the loop isn't yet running and no config was read then bail
-            print "No configuration found in {0}".format(config_files)
-            sys.exit(3)
-
-        if self.running and not files_read:
-            # Server is running, but config reload failed.
-            log.msg('Config requested but unable to load. Check {0}'.format(config_files))
-            return
-
-        # At this point, files_read is not empty, so config was read.
-        # Hooray!
-
-    def config(self, attribute, *args, **kwargs):
-        '''
-        This is a front end for self.configparser that makes use of thread
-        locking.
-        Pass an attribute of ConfigParser (such as 'getboolean') and any
-        args and kwargs that argument would take.
-        '''
-        retval = None
-        with self.configlock:
-            try:
-                retval = getattr(self.configparser, attribute)(*args, **kwargs)
-            except AttributeError:
-                log.msg('Error reading config: invalid attribute. {0} ({1}) \{{2}\}'.format(attribute, args, kwargs))
-        return retval
-
-    def run(self):
-        '''
-        Begin running the self.serverloop protocol in a twisted reactor.
-        '''
-        if self.running:
-            raise RuntimeException('Server loop controller appears to be running already.')
-        else:
-            addr = self.config('get', 'server', 'address')
-            port = self.config('getint', 'server', 'port')
-            factory = Factory()
-            # TODO reload() needs to go into the factory which spawns Protocols
-            # or in a Protocol which has-a proxy object that is reloaded
-            # TODO http://twistedsphinx.funsize.net/projects/core/howto/upgrading.html
-            reload(self.serverloop)
-            factory.protocol = self.serverloop.LoopProtocol
-
-            cert = None
-            if self.config('getboolean', 'ssl', 'enabled'):
-                # https://twistedmatrix.com/documents/current/core/howto/ssl.html
-                pem = self.config('get', 'ssl', 'certificate_pem_path')
-                crt = self.config('get', 'ssl', 'certificate_path')
-                key = self.config('get', 'ssl', 'certificate_key_path')
-                if pem:
-                    # PEM overrides the other two options.
-                    # Locate key and certificate in a single file.
-                    with open(pem) as pemdata:
-                        cert = ssl.PrivateCertificate.loadPEM(pemdata.read())
-                else:
-                    # Locate key and certificate separately.
-                    with open(key) as keydata:
-                        with open(crt) as crtdata:
-                            cert = ssl.PrivateCertificate.loadPEM(
-                              keydata.read() + crtdata.read()) 
-                reactor.listenSSL(port, factory, cert.options())
+    def gen_server_string(self):
+        addr = self.config('get', 'server', 'address')
+        port = self.config('getint', 'server', 'port')
+        factory = Factory()
+        factory.protocol = serverloop.LoopProtocol
+     
+        cert = None
+        portstring = ''
+        if self.config('getboolean', 'ssl', 'enabled'):
+            # https://twistedmatrix.com/documents/current/core/howto/ssl.html
+            pem = self.config('get', 'ssl', 'certificate_pem_path')
+            crt = self.config('get', 'ssl', 'certificate_path')
+            key = self.config('get', 'ssl', 'certificate_key_path')
+            if pem:
+                # PEM overrides the other two options.
+                # Locate key and certificate in a single file.
+                with open(pem) as pemdata:
+                    cert = ssl.PrivateCertificate.loadPEM(pemdata.read())
             else:
-                reactor.listenTCP(port, factory)
-            # TODO
-            # endpoints.serverFromString(reactor, "tcp:PORT").listen(factory)
-            # endpoints.serverFromString(reactor, "ssl:PORT:keys...").listen(factory)
+                # Locate key and certificate separately.
+                with open(key) as keydata:
+                    with open(crt) as crtdata:
+                        cert = ssl.PrivateCertificate.loadPEM(
+                          keydata.read() + crtdata.read()) 
+            portstring = 'ssl:{0}'.format(port)
+            reactor.listenSSL(port, factory, cert.options())
+        else:
+            portstring = 'tcp:{0}'.format(port)
+            reactor.listenTCP(port, factory)
+        return portstring
 
+        # TODO
+        # endpoints.serverFromString(reactor, portstring).listen(factory)
+ 
 
 if __name__ == '__main__':
-    engine = LoopEngine()
-    engine.run()
-
-    # `python -m twisted.conch.stdio` runs an interactive prompt and reactor
-    # import twisted stuff and give it a go. no need to start reactor??
+    start_app()

@@ -26,27 +26,22 @@ elif py_version.startswith('3.'):
 ##
 
 try:
+    from twisted.internet import defer
     from twisted.application.service import Service
+    from twisted.python import randbytes as PRNG
 except ImportError:
     sys.err.println("The Twisted module must be installed and accessible.")
     sys.exit(1)
-
-try:
-    # A cryptographically secure P-RNG is needed for temporary keys.
-    import OpenSSL.rand as PRNG
-except ImportError:
-    sys.err.println("The OpenSSL module must be installed and accessible.")
-    sys.exit(2)
 
 ##
 # "Global" Constants
 ##
 
 # one or more paths to the configuration file as used by SafeConfigParser
-config_files = ('config.ini',)
+CONFIG_FILES = ('config.ini',)
 
 ##
-# Main Loop class definition
+# Classes
 ##
 
 class Configurator(Service):
@@ -79,16 +74,16 @@ class Configurator(Service):
         '''
         # Make sure self.configparser is not being used concurrently.
         with self.configlock:
-            files_read = self.configparser.read(config_files)
+            files_read = self.configparser.read(CONFIG_FILES)
 
         if not self.running and not files_read:
             # If the loop isn't yet running and no config was read then bail
-            print "No configuration found in {0}".format(config_files)
+            print "No configuration found in {0}".format(CONFIG_FILES)
             sys.exit(3)
 
         if self.running and not files_read:
             # Server is running, but config reload failed.
-            log.msg('Config requested but unable to load. Check {0}'.format(config_files))
+            log.msg('Config requested but unable to load. Check {0}'.format(CONFIG_FILES))
             return 'poop'
 
         # At this point, files_read is not empty, so config was read.
@@ -102,49 +97,10 @@ class Configurator(Service):
         args and kwargs that argument would take.
         '''
         retval = None
+        errmsg = 'Error reading config: invalid attribute. {0} ({1}) \{{2}\}'.format(attribute, args, kwargs)
         with self.configlock:
             try:
                 retval = getattr(self.configparser, attribute)(*args, **kwargs)
             except AttributeError:
-                log.msg('Error reading config: invalid attribute. {0} ({1}) \{{2}\}'.format(attribute, args, kwargs))
+                log.msg(errmsg)
         return retval
-
-    def run(self):
-        '''
-        Begin running the self.serverloop protocol in a twisted reactor.
-        '''
-        if self.running:
-            raise RuntimeException('Server loop controller appears to be running already.')
-        else:
-            addr = self.config('get', 'server', 'address')
-            port = self.config('getint', 'server', 'port')
-            factory = Factory()
-            # TODO the reload() might need to go into the Protocol...
-            reload(self.serverloop)
-            factory.protocol = self.serverloop.LoopProtocol
-
-            cert = None
-            if self.config('getboolean', 'ssl', 'enabled'):
-                # https://twistedmatrix.com/documents/current/core/howto/ssl.html
-                pem = self.config('get', 'ssl', 'certificate_pem_path')
-                crt = self.config('get', 'ssl', 'certificate_path')
-                key = self.config('get', 'ssl', 'certificate_key_path')
-                if pem:
-                    # PEM overrides the other two options.
-                    # Locate key and certificate in a single file.
-                    with open(pem) as pemdata:
-                        cert = ssl.PrivateCertificate.loadPEM(pemdata.read())
-                else:
-                    # Locate key and certificate separately.
-                    with open(key) as keydata:
-                        with open(crt) as crtdata:
-                            cert = ssl.PrivateCertificate.loadPEM(
-                              keydata.read() + crtdata.read()) 
-                reactor.listenSSL(port, factory, cert.options())
-            else:
-                reactor.listenTCP(port, factory)
-
-
-if __name__ == '__main__':
-    engine = LoopEngine()
-    engine.run()
