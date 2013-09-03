@@ -7,35 +7,44 @@ and updated at runtime.
 '''
 
 ##
+# Built-in modules
+##
+
+import sys
+
+##
 # External modules
 ##
 
-from twisted.internet import endpoints
+try:
+    from twisted.internet import service
+    from twisted.application.internet import TCPServer
+except ImportError:
+    sys.err.println("The Twisted module must be installed and accessible.")
+    sys.exit(1)
 
 ##
 # Built-in modules
 ##
 
-from serverfactory import DogiAdminFactory
+from serverfactory import DogiAdmin
 from config import Configurator
 
 ##
-# if run as a script
+# Setup the service for the reactor
+## 
+
+config = Configurator()
+das = DogiServer(config)
+
+application = service.Application('dogiadminserver')
+TCPServer(3644, das.getProtocolFactory()).setServiceParent(
+  service.IServiceCollection(application))
+
+##
+# TODO
+# start engine if run as a script
 ##
 
-if __name__ == '__main__':
-    config = Configurator()
-    daf = DogiAdminFactory(config)
-    endpoints.serverFromString(reactor, daf.gen_server_string_from_config()).listen(daf)
-    reactor.run()
-
-##
-# if run by twistd or as a module
-##
-
-else:
-    application = service.Application('dogiadminserver')
-    daf = DogiAdminFactory(config)
-    # TODO not sure how this works with twistd?
-    # https://twistedmatrix.com/documents/current/core/howto/endpoints.html
-    endpoints.serverFromString(reactor, daf.gen_server_string_from_config()).listen(daf)
+#if __name__ == '__main__':
+#    reactor.run()

@@ -7,50 +7,48 @@ and updated at runtime.
 '''
 
 ##
-# Built-in modules
-##
-
-import sys
-import platform.python_version as py_version
-
-if py_version.startswith('2.'):
-    # Support Python 2.x
-    from ConfigParser import SafeConfigParser
-elif py_version.startswith('3.'):
-    # Support Python 3.x
-    from configparser import SafeConfigParser
-
-##
 # External modules
 ##
 
-try:
-    from twisted.python import log
-    from twisted.internet import reactor
-    from twisted.internet import endpoints
-    from twisted.internet.protocol import ServerFactory
-except ImportError:
-    sys.err.println("The Twisted module must be installed and accessible.")
-    sys.exit(1)
+from twisted.python import log
+from twisted.internet.protocol import ServerFactory
+from twisted.application.service import Service
 
 ##
 # Local modules
 ##
 
-import config
 import serverloop 
 
 ##
 # Classes
 ##
 
-class DogiServerFactory(ServerFactory):
-    protocol = serverloop.DogiAdminProtocol
+class DogiServer(Service):
 
     def __init__(self, configurator):
+        '''
+        Initialize the Service, supplying a configurator with access to
+        reliable configuration information.
+        '''
         self.config = configurator
+        self.factory = ServerFactory()
+        self.factory.protocol = serverloop.DogiAdminProtocol
+        # super
+        Service.__init__(self)
 
-    def gen_server_string_from_config(self):
+    def getProtocolFactory(self):
+        '''
+        Return the Factory which creates Protocol objects.
+        '''
+        return self.factory
+
+    def serverStringFromConfig(self):
+        '''
+        Given the configuration, generate a server string usable for Twisted
+        endpoints.
+        '''
+
         addr = self.config('get', 'server', 'address')
         port = self.config('getint', 'server', 'port')
 

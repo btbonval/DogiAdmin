@@ -25,13 +25,9 @@ elif py_version.startswith('3.'):
 # External modules
 ##
 
-try:
-    from twisted.internet import defer
-    from twisted.application.service import Service
-    from twisted.python import randbytes as PRNG
-except ImportError:
-    sys.err.println("The Twisted module must be installed and accessible.")
-    sys.exit(1)
+from twisted.internet import defer
+from twisted.application.service import Service
+from twisted.python import randbytes as PRNG
 
 ##
 # "Global" Constants
