@@ -10,9 +10,7 @@ and updated at runtime.
 # Built-in modules
 ##
 
-import sys
 import platform.python_version as py_version
-from threading import RLock
 
 if py_version.startswith('2.'):
     # Support Python 2.x
@@ -25,9 +23,11 @@ elif py_version.startswith('3.'):
 # External modules
 ##
 
-from twisted.internet import defer
-from twisted.application.service import Service
+from twisted.python import log
 from twisted.python import randbytes as PRNG
+from twisted.internet import defer
+from twisted.internet import reactor
+from twisted.application.service import Service
 
 ##
 # "Global" Constants
@@ -42,48 +42,73 @@ CONFIG_FILES = ('config.ini',)
 
 class Configurator(Service):
     '''
-    Manage configuration IO as a service.
+    Manage configuration IO as a caching service.
     '''
+
+    def __init__(self, update_interval=5.0, *args, **kwargs):
+        '''
+        Construct the Service.
+        update_interval may be set to the period between
+        configuration cache updates, in seconds, as a float.
+        All other parameters will be passed to the Service constructor.
+        '''
+
+        # super()
+        Service.__init__(self, *args, **kwargs)
+
+        self.configparser = None
+        self.loop_timer = None
+        self.update_interval = update_interval
+
+    def _initialize_parser(self):
+        # Configuration parameters.
+        self.configparser = SafeConfigParser()
 
     def startService(self):
         '''
         Initialize the connection to the configuration store.
         '''
 
-        # super()
-        Service.startService(self)
+        # Ensure the Config Parser is setup.
+        self._initialize_parser()
 
-        # Configuration parameters.
-        self.configparser = SafeConfigParser()
-        self.configlock = RLock()
-
-        # Populate configuration now or die trying.
-        self.update_config()
-        # Timed updates to be called.
+        # Populate configuration now and "loop" it.
+        self._update_config()
 
         # Placeholder encryption key for use when writing secure data to disk.
         self.encryption_key = None
 
-    def update_config(self):
+        # super()
+        Service.startService(self)
+
+    def stopService(self):
+        '''
+        Shutdown and prevent future calls to the loop.
+        '''
+
+        if self.loop_timer:
+            self.loop_timer.cancel()
+            self.loop_timer = None
+
+        # TODO
+        # push any pending writes out to file
+
+    def _update_config(self):
         '''
         Helper method to pull config into self.config.
         '''
-        # Make sure self.configparser is not being used concurrently.
-        with self.configlock:
-            files_read = self.configparser.read(CONFIG_FILES)
 
-        if not self.running and not files_read:
-            # If the loop isn't yet running and no config was read then bail
-            print "No configuration found in {0}".format(CONFIG_FILES)
-            sys.exit(3)
+        # Schedule next read prior to any execution.
+        self.loop_timer = reactor.callLater(self.update_interval, self._update_config)
+        
+        # TODO do we care about concurrent parser access?
+        files_read = self.configparser.read(CONFIG_FILES)
 
-        if self.running and not files_read:
-            # Server is running, but config reload failed.
+        if not files_read:
+            # Config reload failed.
             log.msg('Config requested but unable to load. Check {0}'.format(CONFIG_FILES))
-            return 'poop'
-
-        # At this point, files_read is not empty, so config was read.
-        # Hooray!
+            # TODO
+            return
 
     def config(self, attribute, *args, **kwargs):
         '''
