@@ -24,7 +24,7 @@ except ImportError:
     sys.exit(1)
 
 ##
-# Built-in modules
+# Internal modules
 ##
 
 from serverfactory import DogiAdmin
