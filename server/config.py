@@ -69,14 +69,14 @@ class Configurator(Service):
         Initialize the connection to the configuration store.
         '''
 
+        # Placeholder encryption key for use when writing secure data to disk.
+        self.encryption_key = None
+
         # Ensure the Config Parser is setup.
         self._initialize_parser()
 
         # Populate configuration now and "loop" it.
         self._update_config()
-
-        # Placeholder encryption key for use when writing secure data to disk.
-        self.encryption_key = None
 
         # super()
         Service.startService(self)
@@ -86,6 +86,9 @@ class Configurator(Service):
         Shutdown and prevent future calls to the loop.
         '''
 
+        # super()
+        Service.stopService(self)
+
         if self.loop_timer:
             self.loop_timer.cancel()
             self.loop_timer = None
@@ -93,35 +96,44 @@ class Configurator(Service):
         # TODO
         # push any pending writes out to file
 
-    def _update_config(self):
+    def _loop_update(self):
         '''
-        Helper method to pull config into self.config.
+        Helper method to loop _update_config
         '''
 
         # Schedule next read prior to any execution.
         self.loop_timer = reactor.callLater(self.update_interval, self._update_config)
         
+        self._update_config()
+
+    def _update_config(self):
+        '''
+        Helper method to pull config into self.config.
+        '''
+
         # TODO do we care about concurrent parser access?
         files_read = self.configparser.read(CONFIG_FILES)
 
         if not files_read:
             # Config reload failed.
-            log.msg('Config requested but unable to load. Check {0}'.format(CONFIG_FILES))
-            # TODO
-            return
+            log.err('Config requested but unable to load. Check {0}'.format(CONFIG_FILES))
+
+        if files_read < len(CONFIG_FILES):
+            # Partial load failure, not clear how to proceed
+            log.msg('Not all configuration files were loaded. Check {0}'.format(CONFIG_FILES))
 
     def config(self, attribute, *args, **kwargs):
         '''
-        This is a front end for self.configparser that makes use of thread
+        This is a front end for self.configparser that could make use of thread
         locking.
         Pass an attribute of ConfigParser (such as 'getboolean') and any
         args and kwargs that argument would take.
         '''
         retval = None
         errmsg = 'Error reading config: invalid attribute. {0} ({1}) \{{2}\}'.format(attribute, args, kwargs)
-        with self.configlock:
-            try:
-                retval = getattr(self.configparser, attribute)(*args, **kwargs)
-            except AttributeError:
-                log.msg(errmsg)
+
+        try:
+            retval = getattr(self.configparser, attribute)(*args, **kwargs)
+        except AttributeError:
+            log.msg(errmsg)
         return retval
