@@ -18,11 +18,26 @@ from twisted.application.service import Service
 # Local modules
 ##
 
-import serverloop 
+import serverprotocol
 
 ##
 # Classes
 ##
+
+class DogiFactory(ServerFactory):
+    '''
+    Wrapper around ServerFactory to pass a single argument to the protocol's
+    init.
+    '''
+
+    def __init__(self, service, *args, **kwargs):
+        self.service = service
+        self.protocol = serverprotocol.DogiAdminServerProtocol
+        # super()
+        ServerFactory.__init__(self, *args, **kwargs)
+
+    def buildProtocol(self, addr):
+        return self.protocol(self.service)
 
 class DogiServer(Service):
 
@@ -31,9 +46,15 @@ class DogiServer(Service):
         Initialize the Service, supplying a configurator with access to
         reliable configuration information.
         '''
+        # store some arguments
         self.config = configurator
-        self.factory = ServerFactory()
-        self.factory.protocol = serverloop.DogiAdminProtocol
+
+        # Create a protocol factory
+        self.factory = DogiFactory(service=self)
+
+        # prepare a mapping of clients to their connections and information
+        self.whoswho = {}
+
         # super
         Service.__init__(self)
 
@@ -43,7 +64,30 @@ class DogiServer(Service):
         '''
         return self.factory
 
+    def registerClient(self, ident, protocol_transport, client_info):
+        '''
+        This is called by the underlying protocol to register a client's
+        connection and information with this service. The registry is used
+        to explain which clients are which when the server needs to send a
+        request to a particular client.
+        '''
+        # Link a client to a Twisted Protocol.
+        # The naming is awkward: each connected client has one protocol object.
+        # Within the protocol object is the transport for data transfer.
+        self.whoswho[ident] = protocol_transport
+        # Cache the client's information as read from the configuration.
+        self.whoswho[protocol_transport] = client_info
+
+    def request_tunnel(self, ident, *args, **kwargs):
+        '''
+        Calls DogiAdminProtocol.request_tunnel() from the appropriate object
+        given the ident of the target client.
+        All arguments besides ident are passed through.
+        '''
+        return self.whoswho[ident].request_tunnel(*args, **kwargs)
+
     def serverStringFromConfig(self):
+        # TODO this method is unused for now
         '''
         Given the configuration, generate a server string usable for Twisted
         endpoints.

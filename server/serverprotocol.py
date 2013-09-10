@@ -7,9 +7,16 @@ and updated at runtime.
 '''
 
 ##
+# Built-in modules
+##
+
+from twisted.python import randbytes
+
+##
 # External modules
 ##
 
+from twisted.internet import defer
 from twisted.internet.protocol import amp
 
 ##
@@ -22,19 +29,27 @@ class Greeting(amp.Command):
     arguments = [('iam', amp.String)]
     response = [('valid', amp.Boolean)]
 
-class DogiAdminProtocol(amp.AMP):
+class DogiAdminServerProtocol(amp.AMP):
     '''
-    Server which responds to commands.
+    Server side of the Dogi Administration protocol.
     '''
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, service, *args, **kwargs):
         '''
         Initialize a registry of connections.
         '''
         # super()
         amp.AMP.__init__(self, *args, **kwargs)
 
-        self.whoswho = {}
+        # for parent callbacks
+        self.service = service
+
+        # state machine
+        self.state = 0
+        # failed identification attempts
+        self.failures = 0
+        # TODO this should be from configuration
+        self.maximum_failures = 3
 
     # These two functions are placeholders in case they are needed later
     def connectionMade(self):
@@ -46,21 +61,52 @@ class DogiAdminProtocol(amp.AMP):
         '''
         Handle the initial handshake from a client.
         '''
+        # This is state == 0.
+        if self.state != 0:
+            # Ignore (autofail) any further requests once authorized.
+            return {'valid': False}
         # Verify given identity.
         valid_client = Configurator.config('has_option', 'clients', ident)
-        # TODO how to find the remote cnxn handle?
+        if valid_client: 
+            # Reset failure counter
+            self.failures = 0
+            # Read the client's information.
+            info = Configurator.config('get', 'clients', ident)
+            # Register the client.
+            self.service.registerClient(ident, self, info)
+            self.state = 1
+        else:
+            self.failures = self.failures + 1
+        if self.failures >= self.maximum_failures:
+             # Disconnect the endpoint if it has tried too many times.
+             self.transport.loseConnection()
         return {'valid': valid_client}
     Greeting.responder(greetz)
 
-    def _request_tunnel(self, port):
-
-    def request_tunnel(self, ident, port=None):
+    def request_tunnel(self, port=None):
         '''
-        Request the client (ident) open up a reverse SSH tunnel on local port.
+        Request the client open up a reverse SSH tunnel on local port.
         If no port is specified, one will be picked at random.
+        Returns a deferred if transport.write() does?
+        Definitely returns a deferred if failed.
         '''
-        destination = self.whoswho[ident]
-        # TODO this won't work, the connection is already established.
-        cnxnDeferred = connectProtocol(destination, AMP())
-        # once connection is established, request a tunnel
-        cnxnDeferred.addCallback(self._request_tunnel, port)
+        # This is state 1.
+        if self.state != 1:
+            # Raise an error if requesting a tunnel from an unauthed client.
+            return defer.fail('Improper state for request.')
+
+        if not port:
+            # Autogenerate a port and hope it is free
+            port = -1
+            while (port < 1024):
+                # Grab some random bytes
+                somebytes = randbytes.insecureRandom(2)
+                # Convert bytes into a number
+                port = ord(somebytes[0]) << 8 + ord(somebytes[1])
+
+        # Cache the requested port ... why not?
+        self.local_ssh_port = port
+
+        # Request client connect SSH to local system with reverse tunnel.
+        # Port is to be opened on this system's end of the reverse tunnel.
+        return self.transport.write('SSHTOMYPORT{0}'.format(port))
