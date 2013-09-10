@@ -1,9 +1,7 @@
 '''
 See LICENSE for license information.
 
-This file contains the server's loop control. It is decoupled from
-the code run within the main loop. This allows the main loop to be reloaded
-and updated at runtime.
+This file contains the server's loop control.
 '''
 
 ##
@@ -27,7 +25,7 @@ except ImportError:
 # Internal modules
 ##
 
-from serverfactory import DogiAdmin
+from serverfactory import DogiServer
 from config import Configurator
 
 ##
