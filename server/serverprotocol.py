@@ -29,6 +29,10 @@ class Greeting(amp.Command):
     arguments = [('iam', amp.String)]
     response = [('valid', amp.Boolean)]
 
+class SSHToMe(amp.Command):
+    arguments = [('port', amp.Integer)]
+    response = [('port', amp.Integer)]
+
 class DogiAdminServerProtocol(amp.AMP):
     '''
     Server side of the Dogi Administration protocol.
@@ -109,4 +113,4 @@ class DogiAdminServerProtocol(amp.AMP):
 
         # Request client connect SSH to local system with reverse tunnel.
         # Port is to be opened on this system's end of the reverse tunnel.
-        return self.transport.write('SSHTOMYPORT{0}'.format(port))
+        return self.callRemote(SSHToMe, port=port)
