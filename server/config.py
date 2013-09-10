@@ -10,12 +10,12 @@ and updated at runtime.
 # Built-in modules
 ##
 
-import platform.python_version as py_version
+from platform import python_version as py_version
 
-if py_version.startswith('2.'):
+if py_version().startswith('2.'):
     # Support Python 2.x
     from ConfigParser import SafeConfigParser
-elif py_version.startswith('3.'):
+elif py_version().startswith('3.'):
     # Support Python 3.x
     from configparser import SafeConfigParser
 
