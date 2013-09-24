@@ -1,0 +1,25 @@
+{
+  "name": "DogiAdmin",
+  "description": "",
+  "author": "Bryan Bonvallet",
+  "version": "0.1.0",
+  "repository": "git://github.com/btbonval/dogiadmin.git",
+  "homepage": "https://github.com/btbonval/dogiadmin",
+  "bugs": {
+    "url": "https://github.com/btbonval/dogiadmin/issues"
+  },
+  "keywords": [
+    "Dogi",
+    "remote administration",
+  ],
+//  "scripts": {
+//    "test": "NODE_ENV=test mocha -R spec"
+//  },
+  "tags": [
+    "Dogi",
+    "remote administration",
+  ],
+  "devDependencies": {
+    "pty.js": "0.2.3" 
+  }
+}

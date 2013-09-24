@@ -18,6 +18,10 @@ develop-eggs
 lib
 lib64
 
+# node.js
+env
+node_modules
+
 # Installer logs
 pip-log.txt
 
