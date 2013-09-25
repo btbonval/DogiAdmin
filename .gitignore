@@ -24,6 +24,7 @@ node_modules
 
 # configuration
 conf.server.json
+conf.client.json
 
 # Installer logs
 pip-log.txt

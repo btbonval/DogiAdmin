@@ -31,11 +31,10 @@ function run_server(cfg) {
     // Establish the sockets and main loop of the server.
 
     // setup some if/then stuff as dictionaries
+    // TODO this executes more code than is needed. make it lazy
     var pcl = cfg.server.ssl; // true or false
     var prot = { true: tls, false: net };
     var opts = { true: sslopts.filter_options(cfg.ssl), false: {} }
-
-    console.log(opts);
 
     // call the correct server listener given the configuration.
     var server = prot[pcl].createServer(opts[pcl], function(c) {

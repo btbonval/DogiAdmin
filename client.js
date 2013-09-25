@@ -2,8 +2,9 @@
  * Built-in modules
  ***/
 
-//var tls = require('tls');
-var tls = require('net');
+var tls = require('tls');
+var net = require('net');
+var fs = require('fs');
 
 /***
  * External modules
@@ -12,19 +13,59 @@ var tls = require('net');
 var pty = require('pty.js');
 
 /***
- * Initialize client socket handling.
+ * Local modules
  ***/
 
-var socket = tls.connect(8064, 'localhost');
-var tty = null;
+var sslopts = require('./ssloptions');
+var jsonfuncs = require('./jsonfuncs');
+
+/***
+ * Configuration
+ **/
+
+// once config is read, remove comments, parse it, then kick off server.
+fs.readFile('conf.client.json', function(err,data) {
+    if (err) throw err;
+    run_client(JSON.parse(jsonfuncs.remove_comments(data)));
+});
+
+/***
+ * Program execution
+ ***/
+
+function run_client(cfg) {
+    // Establish the sockets and main loop of the client.
+
+    // setup some if/then stuff as dictionaries
+    // TODO this executes more code than is needed. make it lazy
+    var pcl = cfg.remote.ssl; // true or false
+    var prot = { true: tls, false: net };
+    var opts = { true: sslopts.filter_options(cfg.ssl), false: {} }
+
+    // update the options to contain host and port
+    opts[pcl].host = cfg.remote.host;
+    opts[pcl].port = cfg.remote.port;
+
+    // connect the socket.
+    var socket = prot[pcl].connect(opts[pcl], function() {
+        // check to see if secure connection failed.
+        if (pcl && tls.cleartextStream.authorized === false) {
+            console.log('Secure connection failed: ' + tls.cleartextStream.authorizationError);
+            socket.end();
+        } else {
+            console.log('Connected!');
+            // begin handling protocol
+            socket.on('data', handle_protocol);
+        }
+    });
+}
 
 /***
  * Protocol Handler
  ***/
 
-socket.on('data', handle_protocol);
-
 function handle_protocol(data) {
+    var socket = this;
     // manage client/server protocol communications.
     data = data.toString();
     // first word of data is a command, the rest is arguments.
@@ -34,34 +75,34 @@ function handle_protocol(data) {
     // remove the command from the rest of the string
     data = data.substring(command.length);
 
-    resolve[command](data);
+    resolve[command](socket, data);
 }
 
 var resolve = {
-    "HANDSHAKE": function(args) {
+    "HANDSHAKE": function(socket, args) {
         // Server sent HANDSHAKE command.
         // Return client identifier.
         // TODO
     },
 
-    "PING": function(args) {
+    "PING": function(socket, args) {
         // Server sent PING commmand.
         // Respond with PONG.
         socket.write('PONG\n');
     },
 
-    "BYE": function(args) {
+    "BYE": function(socket, args) {
         // Server sent BYE command.
         // Close socket.
         console.log('Server requests a disconnect. Complying with request...');
         socket.end();
     },
 
-    "TTY": function(args) {
+    "TTY": function(socket, args) {
         // Server sent "TTY" command.
         // Crack open a shell.
         console.log('Server requests a TTY.');
-        tty = new pty.Terminal('bash', [], {
+        var tty = new pty.Terminal('bash', [], {
             name: 'xterm-color',
             cols: 80,
             rows: 30,
