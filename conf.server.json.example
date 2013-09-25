@@ -1,0 +1,37 @@
+// This file is formatted in JSON, except for the comments.
+// Comments will be stripped out before being parsed.
+// Note that JSON is super finicky and thus sucks for humans to edit.
+// http://json.org/
+
+{
+// Server socket parameters.
+"server": {
+    // Address may be "0.0.0.0" for all interfaces, or the IP address of
+    // a specific interface.
+    "address": "127.0.0.1",
+    "port": 8064,
+    // it would be unwise to turn off ssl
+    "ssl": true
+},
+
+// SSL parameters.
+"ssl": {
+    // please use either keyfile or key, certfile or cert, cafile or ca.
+    "keyfile": "test/x509/certs/CERT1A.rsa",
+    "certfile": "test/x509/certs/CERT1A.crt",
+    "cafile": "test/x509/certs/CA1.ca.crt",
+
+    // the following options are passed as options to tls as noted here:
+    // http://nodejs.org/api/tls.html#tls_tls_createserver_options_secureconnectionlistener
+    "requestCert": true,
+    "rejectUnauthorized": true
+
+    // note that these are strings containing PEM data and not file names.
+    // If the corresponding *file variable is set above, that variable's value
+    // (shown below) will be overridden.
+    //"key": "DATA";
+    //"cert": "DATA";
+    //"ca": "DATA";
+}
+
+}

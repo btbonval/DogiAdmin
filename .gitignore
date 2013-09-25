@@ -22,6 +22,9 @@ lib64
 env
 node_modules
 
+# configuration
+conf.server.json
+
 # Installer logs
 pip-log.txt
 
