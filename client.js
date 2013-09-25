@@ -43,7 +43,7 @@ function run_client(cfg) {
     var opts = { true: sslopts.filter_options(cfg.ssl), false: {} }
 
     // update the options to contain host and port
-    opts[pcl].host = cfg.remote.host;
+    opts[pcl].host = cfg.remote.address;
     opts[pcl].port = cfg.remote.port;
 
     // connect the socket.
