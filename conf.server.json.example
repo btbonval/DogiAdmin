@@ -19,7 +19,7 @@
     // please use either keyfile or key, certfile or cert, cafile or ca.
     "keyfile": "test/x509/certs/CERT1A.rsa",
     "certfile": "test/x509/certs/CERT1A.crt",
-    "cafile": "test/x509/certs/CA1.ca.crt",
+    "cafile": "test/x509/certs/CA1.crt",
 
     // the following options are passed as options to tls as noted here:
     // http://nodejs.org/api/tls.html#tls_tls_createserver_options_secureconnectionlistener
