@@ -78,9 +78,9 @@ PEM data.
 ``` JSON
 {
 "ssl": {
-    "key": "DATA";
-    "cert": "DATA";
-    "ca": "DATA";
+    "key": "DATA",
+    "cert": "DATA",
+    "ca": "DATA",
 
     "requestCert": true,
     "rejectUnauthorized": true
@@ -135,6 +135,9 @@ See the Server's TSL configuration section.
 
 Instead of the server's certificate and RSA key, supply the client's
 certificate and RSA key.
+
+`requestCert` won't do anything either way. clients always request the server
+certificate.
 
 ### Execution
 `node client.js`

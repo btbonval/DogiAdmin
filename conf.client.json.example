@@ -28,9 +28,9 @@
     // note that these are strings containing PEM data and not file names.
     // If the corresponding *file variable is set above, that variable's value
     // (shown below) will be overridden.
-    //"key": "DATA";
-    //"cert": "DATA";
-    //"ca": "DATA";
+    //"key": "DATA",
+    //"cert": "DATA",
+    //"ca": "DATA"
 }
 
 }
