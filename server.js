@@ -38,7 +38,18 @@ function run_server(cfg) {
 
     // call the correct server listener given the configuration.
     var server = prot[pcl].createServer(opts[pcl], function(c) {
-        console.log('Connection!');
+        // do not accept unauthorized connections if using TSL
+        if (pcl && c.authorized === false) {
+            console.log('Secure connection failed: ' + c.authorizationError);
+            socket.end();
+            return;
+        }
+        if (pcl) {
+            var id = c.getPeerCertificate()
+            console.log('Connection from', id.fingerprint);
+        } else {
+            console.log('Connection!');
+        }
         process.stdin.resume();
     
         // pipe my terminal IO through the socket's IO
