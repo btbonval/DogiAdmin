@@ -49,7 +49,7 @@ function run_client(cfg) {
     // connect the socket.
     var socket = prot[pcl].connect(opts[pcl], function() {
         // check to see if secure connection failed.
-        if (pcl && tls.cleartextStream.authorized === false) {
+        if (pcl && socket.authorized === false) {
             console.log('Secure connection failed: ' + tls.cleartextStream.authorizationError);
             socket.end();
         } else {
