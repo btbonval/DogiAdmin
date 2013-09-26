@@ -26,6 +26,9 @@ node_modules
 conf.server.json
 conf.client.json
 
+# testing
+test/x509/certs
+
 # Installer logs
 pip-log.txt
 
