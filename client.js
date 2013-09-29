@@ -79,12 +79,6 @@ function handle_protocol(data) {
 }
 
 var resolve = {
-    "HANDSHAKE": function(socket, args) {
-        // Server sent HANDSHAKE command.
-        // Return client identifier.
-        // TODO
-    },
-
     "PING": function(socket, args) {
         // Server sent PING commmand.
         // Respond with PONG.
