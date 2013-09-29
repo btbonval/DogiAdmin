@@ -5,6 +5,7 @@
 var tls = require('tls');
 var net = require('net');
 var fs = require('fs');
+var spawn = require('child_process').spawn
 
 /***
  * External modules
@@ -83,6 +84,38 @@ var resolve = {
         // Server sent PING commmand.
         // Respond with PONG.
         socket.write('PONG\n');
+    },
+
+    "MAC": function(socket, args) {
+        // Server sent the MAC command.
+        // Respond with the MAC address of the connected socket.
+        // Unfortunately node.js does not support MAC address retrieval
+        // natively, so this will be captured through bash.
+
+        // Connected socket local IP address.
+        var localIP = socket.address().address;
+        // Grab the hardware address from ifconfig for the given IP address.
+        // Assumes Linux base system, but so does 'bash' below.
+        console.log('ip',localIP.toString());
+        subproc = spawn('bash', ['-c','ifconfig | grep -B1 ' + localIP.toString()]);
+        subproc.stdout.on('data', function(data) {
+            data = data.toString();
+            // Extract MAC from ifconfig and send it to server.
+            // Assumes IPv4 for now ('HWaddr ##:##:##:##:##:##')
+            var start = data.search('HWaddr ') + 7;
+            // not found is -1, -1 + 7 = 6
+            if (start == 6) {
+                socket.write('ERR No HWaddr found, IP address: ' +
+                             localIP.toString() + '\n');
+                return;
+            }
+            var end = start + 17;
+            socket.write(data.slice(start, end));
+            socket.write('\n');
+        });
+        subproc.stderr.on('data', function(data) {
+            socket.write('ERROR' + data.toString() + '\n');
+        });
     },
 
     "BYE": function(socket, args) {
