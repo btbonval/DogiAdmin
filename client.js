@@ -6,6 +6,7 @@ var tls = require('tls');
 var net = require('net');
 var fs = require('fs');
 var spawn = require('child_process').spawn
+var readline = require('readline');
 
 /***
  * External modules
@@ -56,7 +57,10 @@ function run_client(cfg) {
         } else {
             console.log('Connected!');
             // begin handling protocol
-            socket.on('data', handle_protocol);
+            buffer = readline.createInterface(socket, socket);
+            buffer.my_socket = socket;
+            socket.my_buffer = buffer;
+            buffer.on('line', handle_protocol);
         }
     });
 }
@@ -66,9 +70,12 @@ function run_client(cfg) {
  ***/
 
 function handle_protocol(data) {
-    var socket = this;
+    var buffer = this;
+    socket = buffer.my_socket;
     // manage client/server protocol communications.
     data = data.toString();
+    // fix some kind of problem with readline or telnet in charmode
+    data = data.replace('\u0000','');
     // first word of data is a command, the rest is arguments.
     var command = data.split(' ', 1)[0];
     // clean up any excess whitespace at the end of command and normalize case.
@@ -76,21 +83,26 @@ function handle_protocol(data) {
     // remove the command from the rest of the string
     data = data.substring(command.length);
 
-    resolve[command](socket, data);
+    try {
+        resolve[command](buffer, data);
+    } catch (err) {
+        socket.write('command(' + command + '): ' + err.toString() + '\n');
+    }
 }
 
 var resolve = {
-    "PING": function(socket, args) {
+    "PING": function(buffer, args) {
         // Server sent PING commmand.
         // Respond with PONG.
-        socket.write('PONG\n');
+        buffer.my_socket.write('PONG\n');
     },
 
-    "MAC": function(socket, args) {
+    "MAC": function(buffer, args) {
         // Server sent the MAC command.
         // Respond with the MAC address of the connected socket.
         // Unfortunately node.js does not support MAC address retrieval
         // natively, so this will be captured through bash.
+        socket = buffer.my_socket;
 
         // Connected socket local IP address.
         var localIP = socket.address().address;
@@ -118,16 +130,17 @@ var resolve = {
         });
     },
 
-    "BYE": function(socket, args) {
+    "BYE": function(buffer, args) {
         // Server sent BYE command.
         // Close socket.
         console.log('Server requests a disconnect. Complying with request...');
-        socket.end();
+        buffer.my_socket.end();
     },
 
-    "TTY": function(socket, args) {
+    "TTY": function(buffer, args) {
         // Server sent "TTY" command.
         // Crack open a shell.
+        socket = buffer.my_socket;
         console.log('Server requests a TTY.');
         var tty = new pty.Terminal('bash', [], {
             name: 'xterm-color',
@@ -137,7 +150,7 @@ var resolve = {
             env: process.env
         });
         // Stop processing protocol.
-        socket.removeListener('data', handle_protocol);
+        buffer.removeListener('line', handle_protocol);
         // Connect the shell and socket together.
         tty.pipe(socket); // bash.stdout | clientsocket.write
         socket.pipe(tty); // clientsocket.read | bash.stdin
@@ -159,7 +172,7 @@ var resolve = {
             // Object cleanup.
             delete tty;
             // Start processing protocol again.
-            socket.on('data', handle_protocol);
+            buffer.on('line', handle_protocol);
             console.log('Terminal reset completed.');
         }
         for(var i = 0; i < events.length; i++) {
