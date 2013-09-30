@@ -4,6 +4,11 @@
 // http://json.org/
 
 {
+// Where to put admin interface
+"admin": {
+    "port": 11123
+},
+
 // Server socket parameters.
 "server": {
     // Address may be "0.0.0.0" for all interfaces, or the IP address of
