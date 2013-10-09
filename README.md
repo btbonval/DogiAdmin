@@ -45,6 +45,10 @@ from the JSON prior to parsing it, because comments are useful, and JSON is not.
 Example:
 ``` JSON
 {
+"admin": {
+    "port": 11123
+},
+
 "server": {
     "address": "127.0.0.1",
     "port": 8064,
@@ -53,10 +57,14 @@ Example:
 }
 ```
 
-* `address` follows usual `bind(2)` rules. It should be a string. If you
+* admin
+ * `port` is a 2-byte integer. 0-1023 usually require advanced privileges.
+Connect to this port on the localhost to access the administrative interface.
+* server
+ * `address` follows usual `bind(2)` rules. It should be a string. If you
 aren't using Unix, I don't know what to tell you about this.
-* `port` is a 2-byte integer. 0-1023 usually require advanced privileges.
-* `ssl` should always be true! See Security above.
+ * `port` is a 2-byte integer. 0-1023 usually require advanced privileges.
+ * `ssl` should always be true! See Security above.
 
 #### TSL section
 This example shows the usual style of supplying PEM files.
@@ -101,10 +109,25 @@ both. The same is true for `cert` and `certfile` as well as `key` and `keyfile`.
 appear. The same applies with the other combinations.
 
 ### Execution
-`node server.js`
+Run the server with `node server.js`.
 
-### Commands
-Once a client has connected, the following commands do stuff:
+Once the server is running, connect to the admin interace with
+`telnet localhost 11123`. This assumes port 11123 is set for the admin
+interface (see server configuration above). Replace 11123 with the appropriate
+port based on the configuration setting.
+
+### Admin Interface Commands
+
+* `WHO` will list connected clients by their unique ID.
+* `CMD ##:##:##:##:...:##` will create a connection to the client with the given ID.
+
+Once `CMD` is run, the server will advise which port to connect to. If the port
+reported is 60854, then `telnet localhost 60854` will connect to the client CLI
+for the desired client.
+
+### Client CLI Commands
+See `CMD` of Admin Interface Commands to raise a client CLI. Once connected
+to a client CLI:
 
 * `PING` returns `PONG` from the client.
 * `BYE` tells the client to disconnect.

@@ -85,6 +85,12 @@ function run_server(cfg) {
             c.unpipe();
             c.end();
 
+            // disconnect CLI socket if opened
+            // stopping the server from listening via close will raise the
+            // 'close' event, which is programmed to kill socket connections
+            // below.
+            if (clientlist.adminports[id]) clientlist.adminports[id].close();
+
             // stop tracking client
             delete clientlist.adminports[id];
             delete clientlist.sockets[id];
@@ -167,30 +173,62 @@ var resolve = {
     "CMD": function(buffer, data) {
         // admin requests cli to the client.
         socket = buffer.my_socket;
+        clientlist = buffer.clientlist;
 
-        // TODO
-        socket.write('WORK IN PROGRESS\n');
-        return;
-
+        // cleanup prepended spaces
+        data = data.trimLeft();
         // first word of data is client id
         client = data.split(' ', 1)[0];
         // clean up any excess whitespace at the end of command and normalize case.
         client = client.trimRight().toUpperCase();
-        // return info from clientlist
-        try {
-            var clientsocket = buffer.clientlist[client];
-        } catch (error) {
-            socket.write('client was not found: ' + client.toString() + '\n');
+
+        // check to see if the client is connected to Dogi Admin sever
+        if (!clientlist.sockets[client]) {
+            socket.write('No client connected with id ' + client + '.\n');
             return
         }
 
-        // Stop processing protocol.
-        buffer.removeListener('line', handle_protocol);
+        // check to see if client already has a CLI socket
+        if (clientlist.adminports[client]) {
+            socket.write('Already listening for ' + client.toString() + ' on port ' + clientlist.adminports[client].address().port + '\n');
+            return
+        }
 
-        // pipe socket's IO through to admin IO
-        // (don't close either client or admin pipes if the other end closes)
-        socket.pipe(clientsocket);
-        clientsocket.pipe(socket);
-        
+        // create new socket for the admin's CLI to the client
+        clientlist.adminports[client] = net.createServer(function(c) {
+            console.log('Admin connected to client ' + client + '.');
+
+            // handle admin disconnection
+            c.once('end', function() {
+                // if the client disconnects, this will not be called
+                if (clientlist.sockets[client]) {
+                    // unhook pipes
+                    clientlist.sockets[client].unpipe(c);
+                    c.unpipe(clientlist.sockets[client]);
+                    console.log('Client ' + client + ' disconnected.');
+                }
+                console.log('Admin disconnected from client ' + client + '.');
+            });
+
+            // if the admin CLI server stops listening, disconnect sockets
+            clientlist.adminports[client].once('close', function() {
+                if (clientlist.sockets[client]) clientlist.sockets[client].end();
+                if (c) c.end();
+            });
+
+            // pipe client socket to its local socket
+            // make sure the client socket doesn't get closed if the admin
+            // disconnects with {'end': false}. the client socket should always
+            // remain connected.
+            c.pipe(clientlist.sockets[client], {'end': false});
+            clientlist.sockets[client].pipe(c);
+        });
+
+        // open up new local port
+        clientlist.adminports[client].maxConnections = 1;
+        clientlist.adminports[client].listen(0, '127.0.0.1', function() {
+            console.log('Listening for admin connection to client ' + client + ' on ' + clientlist.adminports[client].address().port);
+            socket.write('Listening for admin connection to client ' + client + ' on ' + clientlist.adminports[client].address().port + '\n');
+        });
     }
 };
